@@ -5,3 +5,4 @@ vectorstore/
 docs/
 bge-m3
 *.log
+server/upload_tasks.yaml
