@@ -10,3 +10,4 @@ sentence-transformers
 pymupdf
 torch
 python-multipart
+PyYAML
