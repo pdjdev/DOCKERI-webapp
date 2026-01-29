@@ -463,6 +463,8 @@ async function loadDocumentList() {
                     </button>
                 </div>
             `).join('');
+
+            document.getElementById('connection_status').classList.remove('offline');
         } else {
             docListContainer.innerHTML = '<p style="padding:10px; font-size:12px; color:#666;">저장된 문서가 없습니다.</p>';
         }
@@ -521,7 +523,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('suggestion-cards').innerHTML = suggestions.map(card => `
         <div class="card" onclick="document.getElementById('prompt-input').value='${card.text}'; sendMessage();">
             <p class="card-text">${card.text}</p>
-            <div class="card-icon-wrapper"><i class="bx bx-bulb icon-sm" style="color: ${card.color};"></i></div>
+            <div class="card-icon-wrapper"><i class="bx bx-light-bulb icon-sm" style="color: ${card.color};"></i></div>
         </div>
     `).join('');
 
@@ -542,6 +544,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('menu-toggle').addEventListener('click', () => {
         document.getElementById('sidebar').classList.toggle('closed');
+    });
+
+    document.getElementById('close-sidebar-btn').addEventListener('click', () => {
+        document.getElementById('sidebar').classList.add('closed');
     });
     
     // 새 채팅 (새 세션 시작)

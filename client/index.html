@@ -8,6 +8,39 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link href="./css/style.css" rel="stylesheet">
     <link href="https://cdn.boxicons.com/3.0.8/fonts/basic/boxicons.min.css" rel="stylesheet">
+
+    <style>
+        .sources {
+            background-color: #242424;
+            padding: 20px;
+            margin-top: 15px;
+            border-radius: 20px;
+            line-height: 1.4;
+        }
+
+        .sources-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .sources ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            font-size: .95em;
+            color: #c4c4c4;
+        }
+
+        .source-name {
+            font-weight: bold;
+            color: #d8d8d8;
+        }
+
+        .sources li {
+            margin-bottom: 5px;
+        }
+    </style>
 </head>
 <body>
 
@@ -31,6 +64,9 @@
                 <button class="new-chat-btn" id="new-chat-btn">
                     <i class='bx bx-plus'></i> 새 채팅
                 </button>
+                <button class="close-sidebar-btn" id="close-sidebar-btn">
+                    <i class='bx  bx-chevron-left'></i> 
+                </button>
             </div>
             <div class="recent-chats">
                 <p class="recent-label">문서 목록</p>
@@ -43,7 +79,7 @@
             </div>
             <div class="sidebar-footer">
                 <div class="location-info">
-                    <span class="dot"></span> 백엔드 연결 상태
+                    <span id="connection_status" class="dot offline"></span> 백엔드 연결 상태
                 </div>
             </div>
         </aside>

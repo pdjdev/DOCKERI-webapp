@@ -124,8 +124,8 @@ class RAGManager:
 
         # 시스템 프롬프트 (Context 포함)
         system_template = (
-            "당신은 전문 기술 지원 AI입니다. 아래 제공된 [참고 문서]를 바탕으로 답변하세요.\n"
-            "문서 내용을 기반으로 답변하되, 문서에 없는 내용은 '문서에서 찾을 수 없습니다'라고 하세요.\n"
+            "당신은 전문 기술 (전기 기술 특화) AI 에이전트 'DOCKERI' 입니다."
+            "아래 제공된 [참고 문서]는 사용자의 질문을 바탕으로 검색된 관련 자료들로, 이를 바탕으로 답변하세요.\n"
             "이전 대화 맥락을 고려하여 자연스럽게 답변하세요.\n\n"
             "[참고 문서]\n{context}"
         )
@@ -475,7 +475,7 @@ async def chat_stream_endpoint(request: ChatRequest):
     context_text = "\n\n".join(doc.page_content for doc in retrieved_docs)
     
     system_prompt = (
-        "당신은 기술 지원 전문가입니다. 아래 제공된 [참고 문서] 내용만을 바탕으로 답변하세요. "
+        "당신은 KERI 기술 지원 전문가입니다. 아래 제공된 [참고 문서] 내용을 바탕으로 질문에 답변하세요. "
         "문서에 내용이 없다면 '해당 내용은 문서에서 찾을 수 없습니다'라고 답변하세요.\n\n"
         "[참고 문서]\n{context}"
     )
@@ -500,15 +500,25 @@ async def chat_stream_endpoint(request: ChatRequest):
             }):
                 yield chunk # 텍스트 조각 전송
 
-            # (2) 답변 완료 후 출처 정보 전송 (선택 사항)
+            # (2) 답변 완료 후 출처 정보 전송
             # 클라이언트가 텍스트만 쭉 찍어도 보기 좋게 줄바꿈 후 출처 표기
             if retrieved_docs:
                 unique_sources = sorted(list(set(
                     os.path.basename(doc.metadata.get('source', 'Unknown')) 
                     for doc in retrieved_docs
                 )))
-                sources_text = "\n\n---\n**참고 문헌:**\n" + "\n".join(f"- {s}" for s in unique_sources)
-                yield sources_text
+                sources_text = "\n\n<div class='sources'><p class='sources-title'>참고 자료</p>"
+                sources_text += "<ul>"
+
+                # 참고한 파트도 일부 (최대 100자) 함께 제공
+                for doc in retrieved_docs:
+                    source = os.path.basename(doc.metadata.get('source', 'Unknown'))
+                    snippet = doc.page_content[:100].replace("\n", " ") + ("..." if len(doc.page_content) > 100 else "")
+                    sources_text += f"<li><span class='source-name'>{source}:</span> <span class='source-snippet'>{snippet}</span></li>"
+
+                sources_text += "</ul>"
+
+                yield sources_text + "</div>"
 
         except Exception as e:
             # 스트리밍 도중 에러 발생 시

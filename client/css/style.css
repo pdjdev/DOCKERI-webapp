@@ -5,7 +5,7 @@
     --hover-color: #282A2D;
     --text-primary: #E3E3E3;
     --text-secondary: #9CA3AF;
-    --accent-color: #a855f7; /* Purple for User */
+    --accent-color: #006bad; /* Blue for User */
     --danger-color: #ef4444; /* Red for Delete */
     --sidebar-width: 280px;
     --header-height: 64px;
@@ -47,7 +47,7 @@ body {
     flex-shrink: 0; white-space: nowrap; overflow: hidden; z-index: 20;
 }
 .sidebar.closed { width: 0; opacity: 0; pointer-events: none; }
-.sidebar-header { padding: 24px 16px 16px 16px; }
+.sidebar-header { padding: 24px 16px 16px 16px; display: flex; align-items: center; justify-content: space-between; }
 
 .new-chat-btn {
     display: flex; align-items: center; gap: 12px;
@@ -58,7 +58,17 @@ body {
 }
 .new-chat-btn:hover { background-color: var(--hover-color); color: var(--text-primary); }
 
-.recent-chats { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.close-sidebar-btn {
+    display: none;
+    background: none; border: none; color: var(--text-secondary);
+    padding: 3px; border-radius: 50%; cursor: pointer;
+    transition: background 0.2s;
+    margin-left: auto;
+}
+.close-sidebar-btn i { font-size: 30px; }
+.close-sidebar-btn:hover { background-color: var(--hover-color); color: var(--text-primary); }
+
+.recent-chats { flex: 1; overflow-x: hidden; overflow-y: auto; padding: 8px 12px; }
 .recent-label { font-size: 12px; font-weight: 500; color: var(--text-secondary); padding: 0 16px; margin-bottom: 8px; }
 
 /* Document Item Style */
@@ -92,6 +102,7 @@ body {
 .sidebar-footer { padding: 12px; margin-top: auto; }
 .location-info { font-size: 12px; color: var(--text-secondary); padding: 8px 12px; display: flex; align-items: center; gap: 8px; }
 .dot { width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; }
+.dot.offline { background-color: #747474; }
 
 /* --- Main Content --- */
 .main-content {
@@ -153,7 +164,7 @@ body {
 
 .welcome-title { font-size: 48px; font-weight: 600; line-height: 1.2; margin-bottom: 8px; }
 .gradient-text {
-    background: linear-gradient(to right, #60a5fa, #c084fc, #f87171);
+    background: linear-gradient(to right,  #148bd4, #ffa916);
     -webkit-background-clip: text; background-clip: text; color: transparent;
 }
 .welcome-subtitle { font-size: 48px; font-weight: 600; color: #4b5563; margin-bottom: 48px; }
@@ -186,7 +197,7 @@ body {
     width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold;
 }
-.bot-avatar { background-color: #26C6DA; color: #000; }
+.bot-avatar { background-color: #ffa300; color: #000; }
 .user-avatar-sm { background-color: var(--accent-color); color: #fff; }
 
 .message-content {
@@ -280,4 +291,5 @@ textarea {
     .sidebar { position: absolute; height: 100%; }
     .sidebar:not(.closed) { box-shadow: 4px 0 12px rgba(0,0,0,0.5); }
     .welcome-title, .welcome-subtitle { font-size: 32px; }
+    .close-sidebar-btn { display: block; }
 }
