@@ -461,12 +461,6 @@ body {
   margin-bottom: 8px;
 }
 
-.message-content code {
-  background: #2d2d2d;
-  padding: 2px 4px;
-  border-radius: 4px;
-  font-family: monospace;
-}
 
 .message-content pre {
   background: #1a1a1a;
@@ -474,6 +468,73 @@ body {
   border-radius: 8px;
   overflow-x: auto;
   margin-bottom: 12px;
+}
+
+/* Code Execution Blocks */
+.code-execute-block,
+.code-print-block {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  padding: 10px 16px 16px 16px;
+  margin: 12px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-x: auto;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.code-block-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.code-execute-block .code-block-label {
+  color: #60a5fa;
+}
+
+.code-print-block .code-block-label {
+  color: #22c55e;
+}
+
+.code-copy-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text-primary);
+}
+
+.code-copy-btn.copied {
+  background: #22c55e;
+  color: white;
+}
+
+.code-block-content {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
 }
 
 /* Sources */

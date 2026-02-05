@@ -1,8 +1,77 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { marked } from 'marked';
 import type { Message, UploadStatusInfo } from '../types';
 import { escapeHtml, scrollToBottom } from '../utils/helpers';
-import { Plus, Send, LightBulb } from '@boxicons/react';
+import { Plus, Send, LightBulb, Copy, Check } from '@boxicons/react';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+interface CodeBlockProps {
+  code: string;
+  type: 'execute' | 'print';
+}
+
+function CodeBlock({ code, type }: CodeBlockProps) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('복사 실패:', err);
+    }
+  };
+
+  return (
+    <div className={type === 'execute' ? 'code-execute-block' : 'code-print-block'}>
+      <div className="code-block-header">
+        <span className="code-block-label">
+          {type === 'execute' ? '실행된 코드' : '실행 결과'}
+        </span>
+        <button
+          className={`code-copy-btn ${copied ? 'copied' : ''}`}
+          onClick={handleCopy}
+        >
+          {copied ? (
+            <>
+              <Check style={{ width: 14, height: 14, marginRight: 4 }} />
+              복사됨
+            </>
+          ) : (
+            <>
+              <Copy style={{ width: 14, height: 14, marginRight: 4 }} />
+              복사
+            </>
+          )}
+        </button>
+      </div>
+      {type === 'execute' ? (
+        <SyntaxHighlighter
+          language="python"
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            padding: 0,
+            background: 'transparent',
+            fontSize: '14px',
+            lineHeight: '1.5',
+          }}
+          codeTagProps={{
+            style: {
+              fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
+            }
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      ) : (
+        <div className="code-block-content">{code}</div>
+      )}
+    </div>
+  );
+}
 
 interface MessageRowProps {
   message: Message;
@@ -11,6 +80,78 @@ interface MessageRowProps {
 export function MessageRow({ message }: MessageRowProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const partsText = (message.parts || []).map((p) => p.text || '').join('\n');
+
+  // code-execute, code-print 태그 파싱 및 렌더링
+  const parseCodeBlocks = (text: string) => {
+    const parts: JSX.Element[] = [];
+    let lastIndex = 0;
+    let keyCounter = 0;
+
+    // code-execute 태그 찾기
+    const executeRegex = /<code-execute>([\s\S]*?)<\/code-execute>/g;
+    const printRegex = /<code-print>([\s\S]*?)<\/code-print>/g;
+
+    // 모든 태그를 순서대로 찾기 위해 결합
+    const allMatches: Array<{ index: number; type: 'execute' | 'print'; code: string; length: number }> = [];
+
+    let match;
+    while ((match = executeRegex.exec(text)) !== null) {
+      allMatches.push({
+        index: match.index,
+        type: 'execute',
+        code: match[1].trim(),
+        length: match[0].length,
+      });
+    }
+
+    while ((match = printRegex.exec(text)) !== null) {
+      allMatches.push({
+        index: match.index,
+        type: 'print',
+        code: match[1].trim(),
+        length: match[0].length,
+      });
+    }
+
+    // 인덱스 순으로 정렬
+    allMatches.sort((a, b) => a.index - b.index);
+
+    // 파싱
+    allMatches.forEach((m) => {
+      // 이전 텍스트 추가
+      if (m.index > lastIndex) {
+        const textBefore = text.substring(lastIndex, m.index);
+        if (textBefore.trim()) {
+          parts.push(
+            <div
+              key={`text-${keyCounter++}`}
+              dangerouslySetInnerHTML={{ __html: marked.parse(textBefore) }}
+            />
+          );
+        }
+      }
+
+      // 코드 블록 추가
+      parts.push(<CodeBlock key={`code-${keyCounter++}`} code={m.code} type={m.type} />);
+
+      lastIndex = m.index + m.length;
+    });
+
+    // 남은 텍스트 추가
+    if (lastIndex < text.length) {
+      const textAfter = text.substring(lastIndex);
+      if (textAfter.trim()) {
+        parts.push(
+          <div
+            key={`text-${keyCounter++}`}
+            dangerouslySetInnerHTML={{ __html: marked.parse(textAfter) }}
+          />
+        );
+      }
+    }
+
+    return parts.length > 0 ? parts : null;
+  };
 
   // sources 토글 기능 추가 및 파일명 강조
   useEffect(() => {
@@ -112,14 +253,23 @@ export function MessageRow({ message }: MessageRowProps) {
     );
   }
 
+  // 코드 블록 파싱 시도
+  const parsedContent = parseCodeBlocks(partsText);
+
   return (
     <div className="message-row bot">
       <div className="message-avatar bot-avatar">AI</div>
-      <div
-        ref={contentRef}
-        className="message-content"
-        dangerouslySetInnerHTML={{ __html: marked.parse(partsText) }}
-      />
+      {parsedContent ? (
+        <div ref={contentRef} className="message-content">
+          {parsedContent}
+        </div>
+      ) : (
+        <div
+          ref={contentRef}
+          className="message-content"
+          dangerouslySetInnerHTML={{ __html: marked.parse(partsText) }}
+        />
+      )}
     </div>
   );
 }

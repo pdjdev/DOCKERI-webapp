@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import hashlib
 import traceback
@@ -23,9 +24,11 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableSerializable
+
 # TextLoader 추가 (마크다운 지원)
 from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 # Code Execution 지원
 import subprocess
 import re
@@ -351,10 +354,11 @@ def execute_python_code(code: str) -> str:
     """
     try:
         result = subprocess.run(
-            ['python', '-c', code],
+            [sys.executable, '-c', code],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
+            env=os.environ.copy()  # 환경 변수 상속
         )
         output = result.stdout
         if result.stderr:
