@@ -23,8 +23,12 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableSerializable
-from langchain_community.document_loaders import PyMuPDFLoader
+# TextLoader 추가 (마크다운 지원)
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+# Code Execution 지원
+import subprocess
+import re
 
 # --- 설정 및 상수 ---
 load_dotenv()
@@ -108,10 +112,11 @@ class RAGManager:
         if self.vectorstore:
             self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 4})
 
-    def get_chain(self, temperature=0.1):
+    def get_chain(self, temperature=0.1, enable_code_execution=False):
         """
         LCEL(LangChain Expression Language)을 사용하여 체인을 동적으로 생성
         스트리밍과 히스토리 처리에 최적화됨
+        code_interpreter 기능 지원 옵션
         """
         if not self.retriever:
             return None
@@ -121,12 +126,17 @@ class RAGManager:
             temperature=temperature, 
             streaming=True # 스트리밍 활성화
         )
+        
+        # Code Interpreter 바인딩 (선택 사항)
+        if enable_code_execution:
+            llm = llm.bind_tools([{"code_execution": {}}])
 
         # 시스템 프롬프트 (Context 포함)
         system_template = (
             "당신은 전문 기술 (전기 기술 특화) AI 에이전트 'DOCKERI' 입니다."
             "아래 제공된 [참고 문서]는 사용자의 질문을 바탕으로 검색된 관련 자료들로, 이를 바탕으로 답변하세요.\n"
-            "이전 대화 맥락을 고려하여 자연스럽게 답변하세요.\n\n"
+            "이전 대화 맥락을 고려하여 자연스럽게 답변하세요.\n"
+            "필요한 경우 Python 코드를 실행하여 계산하거나 분석할 수 있습니다.\n\n"
             "[참고 문서]\n{context}"
         )
 
@@ -155,7 +165,7 @@ class RAGManager:
 
     def ingest_documents(self, target_filename: Optional[str] = None, progress_callback: Optional[Callable[[int, str], None]] = None):
         """
-        문서 폴더 스캔 및 DB 업데이트
+        문서 폴더 스캔 및 DB 업데이트 (PDF 및 Markdown 지원)
         
         Args:
             target_filename: 특정 파일만 처리하고 싶을 때 파일명 지정 (없으면 전체 스캔)
@@ -182,13 +192,14 @@ class RAGManager:
             except Exception:
                 pass # 인덱스가 비어있거나 접근 불가 시 무시
 
-        # 2. 처리할 파일 식별
-        all_pdf_files = [f for f in os.listdir(DATA_PATH) if f.lower().endswith('.pdf')]
+        # 2. 처리할 파일 식별 (.pdf 및 .md 파일 검색)
+        allowed_extensions = ('.pdf', '.md')
+        all_files = [f for f in os.listdir(DATA_PATH) if f.lower().endswith(allowed_extensions)]
         
         # 특정 파일만 지정된 경우 필터링 (업로드 직후 로직 최적화)
         if target_filename:
-            if target_filename in all_pdf_files:
-                all_pdf_files = [target_filename]
+            if target_filename in all_files:
+                all_files = [target_filename]
             else:
                 report(100, "파일을 찾을 수 없습니다.")
                 return "파일을 찾을 수 없습니다."
@@ -196,8 +207,8 @@ class RAGManager:
         files_to_process = []
         
         # 해시 체크 (약 0~10% 구간 할당)
-        total_scan = len(all_pdf_files)
-        for idx, file in enumerate(all_pdf_files):
+        total_scan = len(all_files)
+        for idx, file in enumerate(all_files):
             file_path = os.path.join(DATA_PATH, file)
             hash_sha256 = hashlib.sha256()
             try:
@@ -229,8 +240,19 @@ class RAGManager:
 
         for idx, (file, f_hash) in enumerate(files_to_process):
             report(10 + int((idx / total_files) * 10), f"문서 읽는 중: {file}")
+            file_path = os.path.join(DATA_PATH, file)
+            
             try:
-                loader = PyMuPDFLoader(os.path.join(DATA_PATH, file))
+                # 확장자에 따른 로더 분기 처리
+                if file.lower().endswith('.pdf'):
+                    loader = PyMuPDFLoader(file_path)
+                elif file.lower().endswith('.md'):
+                    # 마크다운은 TextLoader 사용 (UTF-8 인코딩 지정)
+                    loader = TextLoader(file_path, encoding='utf-8')
+                else:
+                    # 이론상 오지 않음 (위에서 필터링함)
+                    continue
+
                 docs = loader.load()
                 
                 # 메타데이터 주입
@@ -322,6 +344,75 @@ class RAGManager:
         return sorted(list(sources))
 
 # --- 유틸리티 함수 ---
+def execute_python_code(code: str) -> str:
+    """
+    Python 코드를 실행하고 결과를 반환합니다.
+    Code Interpreter용 헬퍼 함수
+    """
+    try:
+        result = subprocess.run(
+            ['python', '-c', code],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        output = result.stdout
+        if result.stderr:
+            output += f"\n[stderr]: {result.stderr}"
+        return output if output else "(출력 없음)"
+    except subprocess.TimeoutExpired:
+        return "[Error: 코드 실행 타임아웃 (10초 초과)]"
+    except Exception as e:
+        return f"[Error executing code: {str(e)}]"
+
+def process_model_response(response) -> str:
+    """
+    모델 응답에서 code_execution_result를 처리하고 최종 텍스트를 생성합니다.
+    response.content_blocks 형태의 응답을 파싱합니다.
+    """
+    if not hasattr(response, 'content_blocks') or not response.content_blocks:
+        # 일반 텍스트 응답
+        return str(response) if hasattr(response, '__str__') else ""
+    
+    final_text = ""
+    
+    for block in response.content_blocks:
+        block_type = block.get('type') if isinstance(block, dict) else getattr(block, 'type', None)
+        
+        # 텍스트 블록 처리
+        if block_type == 'text':
+            text = block.get('text') if isinstance(block, dict) else getattr(block, 'text', '')
+            final_text += text
+        
+        # 코드 실행 호출 블록 처리
+        elif block_type == 'server_tool_call':
+            if isinstance(block, dict):
+                name = block.get('name')
+                args = block.get('args', {})
+            else:
+                name = getattr(block, 'name', '')
+                args = getattr(block, 'args', {})
+            
+            if name == 'code_interpreter':
+                code = args.get('code') if isinstance(args, dict) else getattr(args, 'code', '')
+                if code:
+                    execution_result = execute_python_code(code)
+                    final_text += f"\n\n[Code executed]:\n{code}\n\n[Output]:\n{execution_result}"
+        
+        # 코드 실행 결과 블록 처리 (이미 실행된 결과 표시)
+        elif block_type == 'server_tool_result':
+            if isinstance(block, dict):
+                output = block.get('output', '')
+                status = block.get('status', '')
+            else:
+                output = getattr(block, 'output', '')
+                status = getattr(block, 'status', '')
+            
+            if output:
+                final_text += f"\n[Result]:\n{output}"
+    
+    return final_text
+
 def parse_history(contents: List[Content]) -> tuple[str, List[BaseMessage]]:
     """
     JSON 입력(contents)을 파싱하여:
@@ -448,6 +539,7 @@ async def process_uploaded_file(task_id: str, filename: str):
 async def chat_stream_endpoint(request: ChatRequest):
     """
     구조화된 대화 이력을 받아 스트리밍 응답을 제공합니다.
+    code_interpreter 기능을 지원하여 Python 코드를 실행할 수 있습니다.
     """
     # 1. 시스템 준비 확인
     if not rag_manager.retriever:
@@ -460,22 +552,23 @@ async def chat_stream_endpoint(request: ChatRequest):
         raise HTTPException(status_code=400, detail="질문 내용이 없습니다.")
 
     # 3. 문서 검색 (Sources 확보를 위해 미리 수행)
-    # 스트리밍 중에 retriever를 돌리면 source 정보를 따로 빼내기 복잡하므로 미리 수행
     retrieved_docs = await rag_manager.retriever.ainvoke(current_query)
     
-    # 4. 체인 준비 (retriever 대신 이미 찾은 doc string을 주입하는 방식도 가능하지만, 
-    # 여기서는 검색된 doc을 context로 포매팅하여 직접 프롬프트에 넣는 방식으로 구성)
-    
+    # 4. 체인 준비 (code_interpreter 활성화)
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash", 
         temperature=request.temperature, 
         streaming=True
     )
     
+    # Code Interpreter 바인딩
+    llm = llm.bind_tools([{"code_execution": {}}])
+    
     context_text = "\n\n".join(doc.page_content for doc in retrieved_docs)
     
     system_prompt = (
         "당신은 KERI 기술 지원 전문가입니다. 아래 제공된 [참고 문서] 내용을 바탕으로 질문에 답변하세요. "
+        "필요한 경우 Python 코드를 실행하여 계산이나 분석을 수행할 수 있습니다. "
         "문서에 내용이 없다면 '해당 내용은 문서에서 찾을 수 없습니다'라고 답변하세요.\n\n"
         "[참고 문서]\n{context}"
     )
@@ -486,22 +579,49 @@ async def chat_stream_endpoint(request: ChatRequest):
         ("human", "{question}"),
     ])
     
-    # Context를 미리 주입한 체인 생성
-    chain = prompt | llm | StrOutputParser()
+    # Context를 미리 주입한 체인 생성 (StrOutputParser 제거, 직접 처리)
+    chain = prompt | llm
 
     # 5. 비동기 제너레이터 함수 정의
     async def response_generator():
         try:
-            # (1) 답변 스트리밍
+            # (1) 답변 스트리밍 - content_blocks 처리
             async for chunk in chain.astream({
                 "context": context_text,
                 "history": history,
                 "question": current_query
             }):
-                yield chunk # 텍스트 조각 전송
+                # content_blocks가 있으면 우선 처리 (code execution 포함)
+                if hasattr(chunk, 'content_blocks') and chunk.content_blocks:
+                    for block in chunk.content_blocks:
+                        block_type = getattr(block, 'type', None) if hasattr(block, 'type') else block.get('type') if isinstance(block, dict) else None
+                        
+                        # 텍스트 블록
+                        if block_type == 'text':
+                            text = getattr(block, 'text', '') if hasattr(block, 'text') else block.get('text', '')
+                            if text:
+                                yield text
+                        
+                        # 코드 실행 호출 감지
+                        elif block_type == 'server_tool_call':
+                            name = getattr(block, 'name', '') if hasattr(block, 'name') else block.get('name', '')
+                            if name == 'code_interpreter':
+                                args = getattr(block, 'args', {}) if hasattr(block, 'args') else block.get('args', {})
+                                code = getattr(args, 'code', '') if hasattr(args, 'code') else args.get('code', '')
+                                if code:
+                                    yield f"\n\n<code-execute>{code}</code-execute>\n\n"
+                        
+                        # 코드 실행 결과
+                        elif block_type == 'server_tool_result':
+                            output = getattr(block, 'output', '') if hasattr(block, 'output') else block.get('output', '')
+                            if output:
+                                yield f"<code-print>{output}</code-print>\n\n"
+                
+                # content_blocks가 없을 때만 일반 content 처리 (중복 방지)
+                elif hasattr(chunk, 'content') and isinstance(chunk.content, str) and chunk.content:
+                    yield chunk.content
 
             # (2) 답변 완료 후 출처 정보 전송
-            # 클라이언트가 텍스트만 쭉 찍어도 보기 좋게 줄바꿈 후 출처 표기
             if retrieved_docs:
                 unique_sources = sorted(list(set(
                     os.path.basename(doc.metadata.get('source', 'Unknown')) 
@@ -541,9 +661,10 @@ async def chat_stream_endpoint(request: ChatRequest):
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
-    """PDF 파일 업로드: 파일 저장 후 바로 응답하고 백그라운드에서 처리 시작"""
-    if not file.filename.lower().endswith('.pdf'):
-        raise HTTPException(status_code=400, detail="PDF 파일만 업로드 가능합니다.")
+    """파일 업로드 (PDF 및 Markdown 지원): 파일 저장 후 바로 응답하고 백그라운드에서 처리 시작"""
+    # PDF와 Markdown 확장자 허용
+    if not file.filename.lower().endswith(('.pdf', '.md')):
+        raise HTTPException(status_code=400, detail="PDF(.pdf) 또는 마크다운(.md) 파일만 업로드 가능합니다.")
 
     file_location = os.path.join(DATA_PATH, file.filename)
     try:
@@ -649,5 +770,4 @@ async def delete_document_endpoint(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
-    # uvicorn 실행 시 access_log=False 등을 추가하여 콘솔 출력을 줄일 수 있습니다.
     uvicorn.run(app, host="0.0.0.0", port=8000)

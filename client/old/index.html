@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOCKERI Agent Web App</title>
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="./css/style.css" rel="stylesheet">
+    <link href="https://cdn.boxicons.com/3.0.8/fonts/basic/boxicons.min.css" rel="stylesheet">
+
+    <style>
+        .sources {
+            background-color: #242424;
+            padding: 20px;
+            margin-top: 15px;
+            border-radius: 20px;
+            line-height: 1.4;
+        }
+
+        .sources-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #ffffff;
+        }
+
+        .sources ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            font-size: .95em;
+            color: #c4c4c4;
+        }
+
+        .source-name {
+            font-weight: bold;
+            color: #d8d8d8;
+        }
+
+        .sources li {
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-backdrop" id="delete-modal">
+        <div class="modal-content">
+            <h3 class="modal-title">문서 삭제</h3>
+            <p class="modal-text" id="delete-msg">이 문서를 영구적으로 삭제하시겠습니까?</p>
+            <div class="modal-actions">
+                <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+                <button class="btn btn-danger" id="confirm-delete-btn">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <button class="new-chat-btn" id="new-chat-btn">
+                    <i class='bx bx-plus'></i> 새 채팅
+                </button>
+                <button class="close-sidebar-btn" id="close-sidebar-btn">
+                    <i class='bx  bx-chevron-left'></i> 
+                </button>
+            </div>
+            <div class="recent-chats">
+                <p class="recent-label">문서 목록</p>
+                <!-- DB에 있는 문서 목록을 보여줌 -->
+                <div id="doc-list"></div>
+            </div>
+            <div class="recent-chats">
+                <p class="recent-label">대화 목록</p>
+                <div id="conv-list"></div>
+            </div>
+            <div class="sidebar-footer">
+                <div class="location-info">
+                    <span id="connection_status" class="dot offline"></span> 백엔드 연결 상태
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            
+            <!-- Top Nav -->
+            <nav class="top-nav">
+                <div class="nav-left">
+                    <button class="icon-btn" id="menu-toggle">
+                        <i class='bx bx-menu'></i>
+                    </button>
+                    <button class="model-selector">DOCKERI Agent</button>
+                </div>
+                <div class="nav-right">
+                    <div class="user-avatar">U</div>
+                </div>
+            </nav>
+
+            <!-- Scrollable Chat Area -->
+            <section class="chat-area" id="chat-container">
+                <!-- Welcome Screen (처음에만 보임) -->
+                <div class="welcome-container" id="welcome-screen">
+                    <h1 class="welcome-title"><span class="gradient-text">안녕하세요,</span></h1>
+                    <h2 class="welcome-subtitle">무엇을 도와드릴까요?</h2>
+                    <div class="cards-grid" id="suggestion-cards"></div>
+                </div>
+
+                <!-- Actual Chat History -->
+                <div id="chat-history"></div>
+            </section>
+
+            <!-- Input Area -->
+            <div class="input-wrapper">
+                <div class="input-container-center">
+                    <div class="input-box">
+                        <!-- File Upload Trigger -->
+                        <input type="file" id="file-upload" accept=".pdf" style="display: none;">
+                        <button class="icon-btn" onclick="document.getElementById('file-upload').click()" title="PDF 업로드">
+                            <i class='bx bx-plus-circle'></i>
+                        </button>
+                        
+                        <textarea id="prompt-input" rows="1" placeholder="질문을 입력하세요..."></textarea>
+                        
+                        <button class="icon-btn" id="send-btn">
+                            <i class="bx bx-send"></i>
+                        </button>
+                    </div>
+                    <p class="disclaimer">DOCKERI는 부정확한 정보를 표시할 수 있습니다. 문서를 기반으로 답변합니다.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="./js/script.js"></script>
+</body>
+</html>
