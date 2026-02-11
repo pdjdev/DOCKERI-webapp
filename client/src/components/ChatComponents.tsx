@@ -1,5 +1,8 @@
 import { useRef, useEffect, useState } from 'react';
+import React from 'react';
 import { marked } from 'marked';
+import katex from 'katex';
+import 'katex/dist/katex.min.css';
 import type { Message, UploadStatusInfo } from '../types';
 import { escapeHtml, scrollToBottom } from '../utils/helpers';
 import { Plus, Send, LightBulb, Copy, Check } from '@boxicons/react';
@@ -81,9 +84,62 @@ export function MessageRow({ message }: MessageRowProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const partsText = (message.parts || []).map((p) => p.text || '').join('\n');
 
+  // LaTeX 수식 렌더링 함수
+  const renderLatex = (text: string): string => {
+    let result = text;
+    const mathPlaceholders: { id: string; html: string }[] = [];
+    let placeholderIndex = 0;
+
+    // Display math ($$...$$) 먼저 처리
+    result = result.replace(/\$\$([\s\S]+?)\$\$/g, (match, latex) => {
+      try {
+        const html = katex.renderToString(latex.trim(), {
+          displayMode: true,
+          throwOnError: false,
+        });
+        const id = `KATEXDISPLAY${placeholderIndex}PLACEHOLDER`;
+        mathPlaceholders.push({ id, html });
+        placeholderIndex++;
+        // 특수 문자로 감싸서 markdown이 건드리지 않도록
+        return `§§§${id}§§§`;
+      } catch (e) {
+        return match;
+      }
+    });
+
+    // Inline math ($...$) 처리
+    result = result.replace(/\$([^$\n]+?)\$/g, (match, latex) => {
+      try {
+        const html = katex.renderToString(latex.trim(), {
+          displayMode: false,
+          throwOnError: false,
+        });
+        const id = `KATEXINLINE${placeholderIndex}PLACEHOLDER`;
+        mathPlaceholders.push({ id, html });
+        placeholderIndex++;
+        // 특수 문자로 감싸서 markdown이 건드리지 않도록
+        return `§§§${id}§§§`;
+      } catch (e) {
+        return match;
+      }
+    });
+
+    // Markdown 파싱
+    result = marked.parse(result) as string;
+
+    // 특수 문자 형태의 placeholder를 실제 LaTeX HTML로 교체
+    // <pre>, <code> 태그 안에 있어도 정규식으로 찾아서 교체
+    mathPlaceholders.forEach(({ id, html }) => {
+      const regex = new RegExp(`§§§${id}§§§`, 'g');
+      result = result.replace(regex, html);
+    });
+
+    return result;
+  };
+
   // code-execute, code-print 태그 파싱 및 렌더링
   const parseCodeBlocks = (text: string) => {
-    const parts: JSX.Element[] = [];
+    const parts: React.JSX.Element[] = [];
     let lastIndex = 0;
     let keyCounter = 0;
 
@@ -125,7 +181,7 @@ export function MessageRow({ message }: MessageRowProps) {
           parts.push(
             <div
               key={`text-${keyCounter++}`}
-              dangerouslySetInnerHTML={{ __html: marked.parse(textBefore) }}
+              dangerouslySetInnerHTML={{ __html: renderLatex(textBefore) }}
             />
           );
         }
@@ -144,7 +200,7 @@ export function MessageRow({ message }: MessageRowProps) {
         parts.push(
           <div
             key={`text-${keyCounter++}`}
-            dangerouslySetInnerHTML={{ __html: marked.parse(textAfter) }}
+            dangerouslySetInnerHTML={{ __html: renderLatex(textAfter) }}
           />
         );
       }
@@ -176,7 +232,7 @@ export function MessageRow({ message }: MessageRowProps) {
       // 모든 sources 섹션에 대해 처리 (sources-title 클릭 가능하도록)
       const sourcesTitles = container.querySelectorAll('.sources-title');
       sourcesTitles.forEach((title) => {
-        title.style.cursor = 'pointer';
+        (title as HTMLElement).style.cursor = 'pointer';
       });
 
       // 각 sources 섹션 내의 li 항목들 포맷팅
@@ -267,7 +323,7 @@ export function MessageRow({ message }: MessageRowProps) {
         <div
           ref={contentRef}
           className="message-content"
-          dangerouslySetInnerHTML={{ __html: marked.parse(partsText) }}
+          dangerouslySetInnerHTML={{ __html: renderLatex(partsText) }}
         />
       )}
     </div>

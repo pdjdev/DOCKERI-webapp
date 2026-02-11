@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Conversation, Message } from './types';
-import axiosClient from './api/axiosClient';
 import { saveConversations, loadConversations } from './utils/localStorage';
 import { Sidebar, TopNav, DeleteModal } from './components/SidebarComponents';
-import { ChatDisplay, InputArea, BotMessageContainer } from './components/ChatComponents';
+import { ChatDisplay, InputArea } from './components/ChatComponents';
 import {
   getDocuments,
   deleteDocument,
