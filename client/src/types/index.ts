@@ -1,5 +1,6 @@
 export interface MessagePart {
   text: string;
+  icon?: 'success' | 'error' | 'info' | 'warning';
 }
 
 export interface Message {

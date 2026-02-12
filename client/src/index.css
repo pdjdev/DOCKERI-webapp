@@ -123,6 +123,18 @@ body {
   padding: 8px 12px;
 }
 
+/* recent chats dark scrollbar */
+.recent-chats::-webkit-scrollbar {
+  width: 6px;
+}
+.recent-chats::-webkit-scrollbar-track {
+  background: var(--surface-color);
+}
+.recent-chats::-webkit-scrollbar-thumb {
+  background: var(--hover-color);
+  border-radius: 6px;
+}
+
 .recent-label {
   font-size: 12px;
   font-weight: 500;

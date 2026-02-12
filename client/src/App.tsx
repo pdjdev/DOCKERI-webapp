@@ -11,9 +11,16 @@ import {
   streamChatMessage,
 } from './services/apiService';
 
+// 에러 객체 타입 가드
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  return String(error);
+}
+
 function App() {
   const [sidebarClosed, setSidebarClosed] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [chatContext, setChatContext] = useState<Message[]>([]);
   const [promptValue, setPromptValue] = useState('');
@@ -22,6 +29,7 @@ function App() {
   const [deleteModalActive, setDeleteModalActive] = useState(false);
   const [targetFileToDelete, setTargetFileToDelete] = useState<string | null>(null);
   const [deleteModalMessage, setDeleteModalMessage] = useState('');
+  const [isFileUploading, setIsFileUploading] = useState(false);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -39,10 +47,42 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const savedConvs = loadConversations();
-    setConversations(savedConvs);
-    loadDocuments();
-  }, [loadDocuments]);
+    const initializeDocuments = async () => {
+      try {
+        const data = await getDocuments();
+        if (data.documents && data.documents.length > 0) {
+          setDocuments(data.documents);        
+        } else {
+          setDocuments([]);
+        }
+        setIsBackendOnline(true);
+      } catch (e) {
+        console.error('문서 목록 로드 실패', e);
+        setIsBackendOnline(false);
+      }
+    };
+    
+    initializeDocuments();
+  }, []);
+
+  // 파일 업로드 중 페이지 나가기 방지
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isFileUploading) {
+        e.preventDefault();
+        e.returnValue = '파일 업로드가 진행 중입니다. 정말 나가시겠습니까?';
+        return e.returnValue;
+      }
+    };
+
+    if (isFileUploading) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isFileUploading]);
 
   const handleNewChat = () => {
     setCurrentConversationId(null);
@@ -89,30 +129,29 @@ function App() {
     const filename = targetFileToDelete;
     closeDeleteModal();
 
-    const userMsg = { role: 'user' as const, parts: [{ text: `🗑️ 문서 삭제 요청: ${filename}` }] };
-    const newContext = [...chatContext, userMsg];
+    // 현재 대화 중이라면 빈 화면으로 전환
+    if (chatContext.length > 0) {
+      handleNewChat();
+    }
+
+    const userMsg = { role: 'user' as const, parts: [{ text: `문서 삭제 요청: ${filename}` }] };
+    const newContext = [userMsg];
     setChatContext(newContext);
 
     try {
       await deleteDocument(filename);
 
-      const botMsg = { role: 'model' as const, parts: [{ text: `✅ '${filename}' 삭제 완료.` }] };
+      const botMsg = { role: 'model' as const, parts: [{ text: `'${filename}' 삭제 완료.`, icon: 'success' as const }] };
       const finalContext = [...newContext, botMsg];
       setChatContext(finalContext);
 
-      if (currentConversationId) {
-        const updatedConvs = conversations.map((c) =>
-          c.id === currentConversationId ? { ...c, messages: finalContext } : c
-        );
-        setConversations(updatedConvs);
-        saveConversations(updatedConvs);
-      }
+      // 더 이상 저장하지 않음 (임시 메시지이므로)
 
       await loadDocuments();
-    } catch (err: any) {
+    } catch (err: unknown) {
       const botMsg = {
         role: 'model' as const,
-        parts: [{ text: `❌ 삭제 실패: ${err.message}` }],
+        parts: [{ text: `삭제 실패: ${getErrorMessage(err)}`, icon: 'error' as const }],
       };
       setChatContext([...newContext, botMsg]);
     }
@@ -178,11 +217,11 @@ function App() {
       );
       setConversations(finalConvs);
       saveConversations(finalConvs);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
       const botMsg = {
         role: 'model' as const,
-        parts: [{ text: `⚠️ 오류가 발생했습니다: ${error.message}` }],
+        parts: [{ text: `오류가 발생했습니다: ${getErrorMessage(error)}`, icon: 'error' as const }],
       };
       const errorContext = [...newContext, botMsg];
       setChatContext(errorContext);
@@ -196,8 +235,15 @@ function App() {
   };
 
   const handleFileSelect = async (file: File) => {
-    const userMsg = { role: 'user' as const, parts: [{ text: `📄 파일 업로드: ${file.name}` }] };
-    const newContext = [...chatContext, userMsg];
+    // 현재 대화 중이라면 빈 화면으로 전환
+    if (chatContext.length > 0) {
+      handleNewChat();
+    }
+
+    setIsFileUploading(true);
+    
+    const userMsg = { role: 'user' as const, parts: [{ text: `파일 업로드: ${file.name}` }] };
+    const newContext = [userMsg];
     setChatContext(newContext);
 
     try {
@@ -205,17 +251,12 @@ function App() {
       const taskId = data.task_id || data.taskId;
 
       if (!taskId) {
-        const botMsg = { role: 'model' as const, parts: [{ text: `✅ ${data.message || '업로드 완료'}` }] };
+        const botMsg = { role: 'model' as const, parts: [{ text: `${data.message || '업로드 완료'}`, icon: 'success' as const }] };
         const finalContext = [...newContext, botMsg];
         setChatContext(finalContext);
-        if (currentConversationId) {
-          const updatedConvs = conversations.map((c) =>
-            c.id === currentConversationId ? { ...c, messages: finalContext } : c
-          );
-          setConversations(updatedConvs);
-          saveConversations(updatedConvs);
-        }
+        // 더 이상 저장하지 않음 (임시 메시지이므로)
         await loadDocuments();
+        setIsFileUploading(false);
         return;
       }
 
@@ -233,30 +274,27 @@ function App() {
       });
 
       if (finalStatus.status === 'done') {
-        const botMsg = { role: 'model' as const, parts: [{ text: `✅ 처리 완료: ${file.name}` }] };
+        const botMsg = { role: 'model' as const, parts: [{ text: `처리 완료: ${file.name}`, icon: 'success' as const }] };
         const finalContext = [...newContext, botMsg];
         setChatContext(finalContext);
-        if (currentConversationId) {
-          const updatedConvs = conversations.map((c) =>
-            c.id === currentConversationId ? { ...c, messages: finalContext } : c
-          );
-          setConversations(updatedConvs);
-          saveConversations(updatedConvs);
-        }
+        // 더 이상 저장하지 않음 (임시 메시지이므로)
         await loadDocuments();
       } else {
         const botMsg = {
           role: 'model' as const,
-          parts: [{ text: `❌ 처리 실패: ${finalStatus.message || '오류'}` }],
+          parts: [{ text: `처리 실패: ${finalStatus.message || '오류'}`, icon: 'error' as const }],
         };
         setChatContext([...newContext, botMsg]);
       }
-    } catch (err: any) {
+      
+      setIsFileUploading(false);
+    } catch (err: unknown) {
       const botMsg = {
         role: 'model' as const,
-        parts: [{ text: `❌ 업로드 실패: ${err.message || String(err)}` }],
+        parts: [{ text: `업로드 실패: ${getErrorMessage(err)}`, icon: 'error' as const }],
       };
       setChatContext([...newContext, botMsg]);
+      setIsFileUploading(false);
     }
   };
 

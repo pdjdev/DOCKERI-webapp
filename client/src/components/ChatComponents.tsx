@@ -80,9 +80,70 @@ interface MessageRowProps {
   message: Message;
 }
 
+// 아이콘 렌더링 헬퍼 함수
+const renderMessageIcon = (iconType?: 'success' | 'error' | 'info' | 'warning') => {
+  if (!iconType) return null;
+  
+  const iconStyle = {
+    marginRight: 6,
+    verticalAlign: 'middle' as const,
+    fontWeight: 'bold',
+    fontSize: '14px'
+  };
+
+  const colors = {
+    success: '#10B981',
+    error: '#EF4444',
+    info: '#3B82F6',
+    warning: '#F59E0B',
+  };
+
+  const icons = {
+    success: <Check style={{ width: 16, height: 16, ...iconStyle, color: colors.success }} />,
+    error: '×',
+    info: 'i',
+    warning: '!',
+  };
+
+  if (iconType === 'success') {
+    return icons.success;
+  }
+
+  return (
+    <span style={{ ...iconStyle, color: colors[iconType] }}>
+      {icons[iconType]}
+    </span>
+  );
+};
+
 export function MessageRow({ message }: MessageRowProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const partsText = (message.parts || []).map((p) => p.text || '').join('\n');
+
+  // 메시지 parts를 렌더링하는 헬퍼 함수
+  const renderMessageParts = () => {
+    const parts = message.parts || [];
+    
+    // parts가 1개이고 아이콘이 있는 경우 (간단한 상태 메시지)
+    if (parts.length === 1 && parts[0].icon) {
+      const part = parts[0];
+      return (
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {renderMessageIcon(part.icon)}
+          <span>{part.text}</span>
+        </div>
+      );
+    }
+    
+    // 일반적인 경우 (코드 블록 파싱 등 포함)
+    const parsedContent = parseCodeBlocks(partsText);
+    if (parsedContent) {
+      return parsedContent;
+    }
+    
+    // 기본 LaTeX 렌더링
+    return <div dangerouslySetInnerHTML={{ __html: renderLatex(partsText) }} />;
+  };
 
   // LaTeX 수식 렌더링 함수
   const renderLatex = (text: string): string => {
@@ -309,23 +370,12 @@ export function MessageRow({ message }: MessageRowProps) {
     );
   }
 
-  // 코드 블록 파싱 시도
-  const parsedContent = parseCodeBlocks(partsText);
-
   return (
     <div className="message-row bot">
       <div className="message-avatar bot-avatar">AI</div>
-      {parsedContent ? (
-        <div ref={contentRef} className="message-content">
-          {parsedContent}
-        </div>
-      ) : (
-        <div
-          ref={contentRef}
-          className="message-content"
-          dangerouslySetInnerHTML={{ __html: renderLatex(partsText) }}
-        />
-      )}
+      <div ref={contentRef} className="message-content">
+        {renderMessageParts()}
+      </div>
     </div>
   );
 }
