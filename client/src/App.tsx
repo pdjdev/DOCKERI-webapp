@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Conversation, Message } from './types';
-import { saveConversations, loadConversations } from './utils/localStorage';
+import { saveConversations, loadConversations } from './utils/indexedDBStorage';
 import { Sidebar, TopNav, DeleteModal } from './components/SidebarComponents';
 import { ChatDisplay, InputArea } from './components/ChatComponents';
 import {
@@ -20,7 +20,7 @@ function getErrorMessage(error: unknown): string {
 
 function App() {
   const [sidebarClosed, setSidebarClosed] = useState(false);
-  const [conversations, setConversations] = useState<Conversation[]>(() => loadConversations());
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [chatContext, setChatContext] = useState<Message[]>([]);
   const [promptValue, setPromptValue] = useState('');
@@ -30,6 +30,22 @@ function App() {
   const [targetFileToDelete, setTargetFileToDelete] = useState<string | null>(null);
   const [deleteModalMessage, setDeleteModalMessage] = useState('');
   const [isFileUploading, setIsFileUploading] = useState(false);
+
+  // IndexedDB에서 대화 목록 로드
+  useEffect(() => {
+    const initializeConversations = async () => {
+      try {
+        const loadedConversations = await loadConversations();
+        setConversations(loadedConversations);
+      } catch (error) {
+        console.error('대화 목록 로드 실패:', error);
+        // 로드 실패해도 빈 배열로 계속 진행
+        setConversations([]);
+      }
+    };
+    
+    initializeConversations();
+  }, []);
 
   const loadDocuments = useCallback(async () => {
     try {
@@ -98,13 +114,18 @@ function App() {
     }
   };
 
-  const handleDeleteConversation = (id: string) => {
+  const handleDeleteConversation = async (id: string) => {
     const idx = conversations.findIndex((c) => c.id === id);
     if (idx === -1) return;
 
     const newConversations = conversations.filter((c) => c.id !== id);
     setConversations(newConversations);
-    saveConversations(newConversations);
+    
+    try {
+      await saveConversations(newConversations);
+    } catch (error) {
+      console.error('대화 삭제 저장 실패:', error);
+    }
 
     if (currentConversationId === id) {
       setCurrentConversationId(null);
@@ -187,14 +208,24 @@ function App() {
       convId = id;
       setConversations(updatedConversations);
       setCurrentConversationId(id);
-      saveConversations(updatedConversations);
+      
+      try {
+        await saveConversations(updatedConversations);
+      } catch (error) {
+        console.error('새 대화 저장 실패:', error);
+      }
     } else {
       const updatedConvs = conversations.map((c) =>
         c.id === convId ? { ...c, messages: newContext } : c
       );
       updatedConversations = updatedConvs;
       setConversations(updatedConvs);
-      saveConversations(updatedConvs);
+      
+      try {
+        await saveConversations(updatedConvs);
+      } catch (error) {
+        console.error('대화 업데이트 저장 실패:', error);
+      }
     }
 
     try {
@@ -216,7 +247,12 @@ function App() {
         c.id === convId ? { ...c, messages: finalContext } : c
       );
       setConversations(finalConvs);
-      saveConversations(finalConvs);
+      
+      try {
+        await saveConversations(finalConvs);
+      } catch (error) {
+        console.error('최종 대화 저장 실패:', error);
+      }
     } catch (error: unknown) {
       console.error(error);
       const botMsg = {
@@ -230,7 +266,12 @@ function App() {
         c.id === convId ? { ...c, messages: errorContext } : c
       );
       setConversations(errorConvs);
-      saveConversations(errorConvs);
+      
+      try {
+        await saveConversations(errorConvs);
+      } catch (saveError) {
+        console.error('에러 대화 저장 실패:', saveError);
+      }
     }
   };
 
@@ -261,10 +302,10 @@ function App() {
       }
 
       // 진행 상황 메시지를 위한 변수
-      let progressContext = [...newContext];
+      let progressContext: Message[] = [...newContext];
 
       const finalStatus = await pollUploadStatus(taskId, (info) => {
-        const progressMsg = {
+        const progressMsg: Message = {
           role: 'model' as const,
           parts: [{ text: '' }],
           uploadStatus: info,
