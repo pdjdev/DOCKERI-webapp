@@ -2,6 +2,7 @@
 채팅 관련 API 엔드포인트
 """
 import os
+import html
 import traceback
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
@@ -55,13 +56,13 @@ async def chat_stream_endpoint(
     # Code Interpreter 바인딩
     llm = llm.bind_tools([{"code_execution": {}}])
     
-    context_text = "\\n\\n".join(doc.page_content for doc in retrieved_docs)
+    context_text = "\n\n".join(doc.page_content for doc in retrieved_docs)
     
     system_prompt = (
         "당신은 KERI 기술 지원 전문가입니다. 아래 제공된 [참고 문서] 내용을 바탕으로 질문에 답변하세요. "
         "필요한 경우 Python 코드를 실행하여 계산이나 분석을 수행할 수 있습니다. "
-        "문서에 내용이 없다면 '해당 내용은 문서에서 찾을 수 없습니다'라고 답변하세요.\\n\\n"
-        "[참고 문서]\\n{context}"
+        "문서에 내용이 없다면 '해당 내용은 문서에서 찾을 수 없습니다'라고 답변하세요.\n\n"
+        "[참고 문서]\n{context}"
     )
     
     prompt = ChatPromptTemplate.from_messages([
@@ -100,13 +101,13 @@ async def chat_stream_endpoint(
                                 args = getattr(block, 'args', {}) if hasattr(block, 'args') else block.get('args', {})
                                 code = getattr(args, 'code', '') if hasattr(args, 'code') else args.get('code', '')
                                 if code:
-                                    yield f"\\n\\n<code-execute>{code}</code-execute>\\n\\n"
+                                    yield f"\n\n<code-execute>{code}</code-execute>\n\n"
                         
                         # 코드 실행 결과
                         elif block_type == 'server_tool_result':
                             output = getattr(block, 'output', '') if hasattr(block, 'output') else block.get('output', '')
                             if output:
-                                yield f"<code-print>{output}</code-print>\\n\\n"
+                                yield f"<code-print>{output}</code-print>\n\n"
                 
                 # content_blocks가 없을 때만 일반 content 처리 (중복 방지)
                 elif hasattr(chunk, 'content') and isinstance(chunk.content, str) and chunk.content:
@@ -118,14 +119,16 @@ async def chat_stream_endpoint(
                     os.path.basename(doc.metadata.get('source', 'Unknown')) 
                     for doc in retrieved_docs
                 )))
-                sources_text = "\\n\\n<div class='sources'><p class='sources-title'>참고 자료</p>"
+                sources_text = "\n\n<div class='sources'><p class='sources-title'>참고 자료</p>"
                 sources_text += "<ul>"
 
                 # 참고한 파트도 일부 (최대 100자) 함께 제공
                 for doc in retrieved_docs:
                     source = os.path.basename(doc.metadata.get('source', 'Unknown'))
-                    snippet = doc.page_content[:100].replace("\\n", " ") + ("..." if len(doc.page_content) > 100 else "")
-                    sources_text += f"<li><span class='source-name'>{source}:</span> <span class='source-snippet'>{snippet}</span></li>"
+                    snippet = doc.page_content[:100].replace("\n", " ") + ("..." if len(doc.page_content) > 100 else "")
+                    # HTML 특수문자 이스케이프 처리 (마크다운, HTML 태그 등 방지)
+                    escaped_snippet = html.escape(snippet, quote=True)
+                    sources_text += f"<li><span class='source-name'>{source}:</span> <span class='source-snippet'>{escaped_snippet}</span></li>"
 
                 sources_text += "</ul>"
 
@@ -133,7 +136,7 @@ async def chat_stream_endpoint(
 
         except Exception as e:
             # 스트리밍 도중 에러 발생 시
-            yield f"\\n\\n[Error occurred: {str(e)}]"
+            yield f"\n\n[Error occurred: {str(e)}]"
             traceback.print_exc()
 
     # 6. StreamingResponse 반환 (버퍼링 방지 헤더 추가)
