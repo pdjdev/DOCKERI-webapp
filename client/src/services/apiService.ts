@@ -77,7 +77,7 @@ export async function uploadFile(file: File) {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await axiosClient.post('/upload', formData, {
+  const response = await axiosClient.post('/upload/', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
