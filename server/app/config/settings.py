@@ -19,6 +19,7 @@ class Settings:
     MODEL_PATH: str = './bge-m3'  # 로컬 모델 경로 또는 HuggingFace ID
     DB_PATH: str = 'vectorstore/db_faiss'
     DATA_PATH: str = './docs'
+    IMGS_PATH: str = './docs/imgs'  # ZIP 문서 이미지 저장 경로
     
     # 태스크 관련 설정
     TASKS_FILE: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "upload_tasks.yaml")
@@ -50,6 +51,7 @@ class Settings:
     def _create_directories(self):
         """필요한 디렉토리 생성"""
         os.makedirs(self.DATA_PATH, exist_ok=True)
+        os.makedirs(self.IMGS_PATH, exist_ok=True)
         os.makedirs(os.path.dirname(self.DB_PATH), exist_ok=True)
 
 

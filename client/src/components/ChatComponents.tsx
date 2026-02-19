@@ -503,7 +503,7 @@ export function InputArea({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.md,.txt"
+            accept=".pdf,.md,.zip"
             style={{ display: 'none' }}
             onChange={handleFileChange}
             id="file-upload"

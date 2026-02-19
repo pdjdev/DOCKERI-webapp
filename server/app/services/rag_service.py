@@ -2,7 +2,9 @@
 RAG (Retrieval-Augmented Generation) 서비스
 """
 import os
+import re
 import hashlib
+import shutil
 import time
 from typing import Optional, Callable, List
 
@@ -233,10 +235,10 @@ class RAGService:
 
     def delete_document(self, filename: str) -> bool:
         """
-        문서 삭제
+        문서 삭제 (벡터 DB + docs/imgs/{doc_name}/ 이미지 폴더 포함)
         
         Args:
-            filename: 삭제할 파일명
+            filename: 삭제할 파일명 (예: "my_doc.md" 또는 "my_doc.pdf")
             
         Returns:
             삭제 성공 여부
@@ -253,6 +255,17 @@ class RAGService:
         self.vectorstore.delete(ids_to_delete)
         self.vectorstore.save_local(settings.DB_PATH)
         self.setup_retriever()
+
+        # ZIP 문서(md)에서 추출된 이미지 폴더도 삭제
+        doc_name = os.path.splitext(filename)[0]
+        imgs_dir = os.path.join(settings.IMGS_PATH, doc_name)
+        if os.path.isdir(imgs_dir):
+            try:
+                shutil.rmtree(imgs_dir)
+                print(f"[삭제] 이미지 폴더 제거: {imgs_dir}")
+            except Exception as e:
+                print(f"[경고] 이미지 폴더 삭제 실패 ({imgs_dir}): {e}")
+
         return True
 
     def get_document_list(self) -> List[str]:
