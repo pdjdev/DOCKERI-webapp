@@ -19,8 +19,8 @@ from app.services import RAGService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
-# 마크다운 이미지 참조 패턴: ![](_page_n_xxx.jpeg)
-_IMG_REF_PATTERN = re.compile(r"!\[.*?\]\((_page_\d+_[^\)]+\.jpe?g)\)", re.IGNORECASE)
+# 마크다운 이미지 참조 패턴: ![](_page_n_xxx.jpeg/.jpg/.png)
+_IMG_REF_PATTERN = re.compile(r"!\[.*?\]\((_page_\d+_[^\)]+\.(?:jpe?g|png))\)", re.IGNORECASE)
 
 
 def get_rag_service() -> RAGService:
@@ -62,8 +62,7 @@ def _build_image_parts(image_paths: list[str]) -> list[dict]:
         try:
             with open(img_path, "rb") as f:
                 b64 = base64.b64encode(f.read()).decode("utf-8")
-            # JPEG 인지 JPG 인지 확인
-            mime = "image/jpeg"
+            mime = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
             parts.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:{mime};base64,{b64}"},

@@ -44,7 +44,7 @@ def _validate_and_extract_zip(zip_bytes: bytes, zip_filename: str):
         HTTPException: 규칙 위반 시
     """
     from fastapi import HTTPException
-    PAGE_PATTERN = re.compile(r"^_page_\d+_.+\.jpe?g$", re.IGNORECASE)
+    PAGE_PATTERN = re.compile(r"^_page_\d+_.+\.(jpe?g|png)$", re.IGNORECASE)
 
     try:
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
@@ -52,7 +52,7 @@ def _validate_and_extract_zip(zip_bytes: bytes, zip_filename: str):
             names = [n for n in zf.namelist() if not n.endswith("/")]
 
             md_files    = [n for n in names if n.lower().endswith(".md")]
-            jpeg_files  = [n for n in names if re.search(r"\.jpe?g$", n, re.IGNORECASE)]
+            jpeg_files  = [n for n in names if re.search(r"\.(jpe?g|png)$", n, re.IGNORECASE)]
             other_files = [n for n in names if n not in md_files and n not in jpeg_files]
 
             if len(md_files) != 1:
@@ -64,7 +64,7 @@ def _validate_and_extract_zip(zip_bytes: bytes, zip_filename: str):
             if other_files:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"ZIP 내에 .md / .jpeg 이외의 파일이 포함되어 있습니다: {other_files}"
+                    detail=f"ZIP 내에 .md / .jpeg / .png 이외의 파일이 포함되어 있습니다: {other_files}"
                 )
 
             invalid_jpegs = [
