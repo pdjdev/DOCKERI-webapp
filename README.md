@@ -81,3 +81,22 @@ run.cmd
 setup.cmd
 ```
 
+
+## 문서 임베딩
+
+### 1. 클라이언트에서 바로 임베딩 수행
+
+질문 입력칸 옆 `+` 버튼을 눌러 `pdf, md` 파일을 바로 업로드하여 임베딩합니다.  
+간단한 문서나 텍스트 임베딩에 적합합니다.
+
+### 2. `pdf to md` 변환을 수행하여 임베딩 수행
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/pdjdev/DOCKERI-webapp/blob/main/tools/pdf_to_md.ipynb)
+
+위 `pdf to md` 파이프라인을 통해 pdf를 `markdown + image` 파일로 전처리한 후 ZIP 파일을 업로드하여 임베딩합니다.  
+복잡한 수식이나 양식이 있거나 도표, 이미지가 중요한 기술 문서에 적합합니다.
+
+
+
+
+
