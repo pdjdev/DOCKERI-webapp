@@ -19,12 +19,71 @@ function CodeBlock({ code, type }: CodeBlockProps) {
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      // 헬퍼 함수 제거, base64 이미지 데이터 제거
+      let copyText = type === 'execute' && code.includes('# <<<HELPER_END>>>')
+        ? code.split('# <<<HELPER_END>>>').slice(1).join('').trimStart()
+        : code;
+      if (type === 'print') {
+        copyText = copyText.replace(/<b64img>(?:webp|png):[\s\S]*?<\/b64img>/g, '[그래프 이미지]');
+      }
+      await navigator.clipboard.writeText(copyText);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('복사 실패:', err);
     }
+  };
+
+  // code-print 내 <b64img>fmt:base64</b64img> 태그를 이미지로 렌더링
+  const renderPrintContent = (text: string): React.JSX.Element[] => {
+    const b64Regex = /<b64img>((?:webp|png):[\s\S]*?)<\/b64img>/g;
+    const parts: React.JSX.Element[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+
+    while ((match = b64Regex.exec(text)) !== null) {
+      // 태그 앞 일반 텍스트
+      if (match.index > lastIndex) {
+        const before = text.substring(lastIndex, match.index).trim();
+        if (before) {
+          parts.push(
+            <div key={`txt-${key++}`} className="code-block-content">{before}</div>
+          );
+        }
+      }
+
+      // base64 이미지 파싱  (형식: "webp:BASE64DATA" 또는 "png:BASE64DATA")
+      const colonIdx = match[1].indexOf(':');
+      const fmt = match[1].substring(0, colonIdx);          // "webp" | "png"
+      const b64data = match[1].substring(colonIdx + 1).trim();
+      const mimeType = fmt === 'webp' ? 'image/webp' : 'image/png';
+
+      parts.push(
+        <div key={`img-${key++}`} className="code-block-img-wrapper">
+          <img
+            src={`data:${mimeType};base64,${b64data}`}
+            alt="Generated chart"
+            className="code-block-img"
+          />
+        </div>
+      );
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    // 태그 뒤 남은 텍스트
+    if (lastIndex < text.length) {
+      const after = text.substring(lastIndex).trim();
+      if (after) {
+        parts.push(
+          <div key={`txt-${key++}`} className="code-block-content">{after}</div>
+        );
+      }
+    }
+
+    // <b64img> 태그가 없으면 그냥 텍스트로 표시
+    return parts.length > 0 ? parts : [<div key="plain" className="code-block-content">{text}</div>];
   };
 
   return (
@@ -67,10 +126,13 @@ function CodeBlock({ code, type }: CodeBlockProps) {
             }
           }}
         >
-          {code}
+          {/* 헬퍼 함수 숨김: <<<HELPER_END>>> 마커 이후 코드만 표시 */}
+          {code.includes('# <<<HELPER_END>>>')
+            ? code.split('# <<<HELPER_END>>>').slice(1).join('').trimStart()
+            : code}
         </SyntaxHighlighter>
       ) : (
-        <div className="code-block-content">{code}</div>
+        <>{renderPrintContent(code)}</>
       )}
     </div>
   );

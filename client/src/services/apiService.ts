@@ -12,6 +12,7 @@ function cleanMessagesForPayload(messages: Message[]): Message[] {
     parts: (message.parts || []).map((part) => ({
       ...part,
       text: (part.text || '')
+        .replace(/<b64img>(?:webp|png):[\s\S]*?<\/b64img>/g, '[그래프 이미지]') // b64 이미지 데이터 제거 (컨텍스트 토큰 절약)
         .replace(/<div class='sources'>[\s\S]*?<\/div>/g, '') // sources 객체 제거
         .replace(/\n+/g, ' ') // 줄바꿈을 공백으로 변환
         .trim(),
