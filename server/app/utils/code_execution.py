@@ -8,10 +8,34 @@ import tempfile
 
 # TODO: 보안 강화 필요 - 현재는 단순 실행, 실제 환경에서는 샌드박스 필요
 
-# matplotlib이 GUI 없이 백엔드를 Agg로 사용하도록 강제하는 프리앰블
+# matplotlib 백엔드 + 한글 폰트 자동 설정 프리앰블
 _PREAMBLE = """\
 import matplotlib
 matplotlib.use('Agg')
+import matplotlib.pyplot as _plt_setup
+import matplotlib.font_manager as _fm
+
+def _setup_korean_font():
+    # 우선순위 순으로 한글 지원 폰트 후보 목록
+    _candidates = [
+        'Malgun Gothic',      # Windows 기본 한글 폰트
+        'NanumGothic',        # 나눔고딕
+        'NanumBarunGothic',   # 나눔바른고딕
+        'AppleGothic',        # macOS
+        'UnDotum',            # Linux
+        'Noto Sans KR',
+        'Noto Sans CJK KR',
+        'Noto Sans CJK JP',   # CJK fallback
+    ]
+    _available = {f.name for f in _fm.fontManager.ttflist}
+    for _font in _candidates:
+        if _font in _available:
+            _plt_setup.rcParams['font.family'] = _font
+            break
+    _plt_setup.rcParams['axes.unicode_minus'] = False  # 마이너스 기호 깨짐 방지
+
+_setup_korean_font()
+del _setup_korean_font, _plt_setup, _fm
 """
 
 
