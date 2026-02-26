@@ -11,3 +11,17 @@ pymupdf
 torch
 python-multipart
 PyYAML
+
+# 수치/통계/시각화 라이브러리 (Code Execution용)
+numpy
+pandas
+scipy
+matplotlib
+seaborn
+statsmodels
+scikit-learn
+sympy
+Pillow
+plotly
+openpyxl
+wordcloud
