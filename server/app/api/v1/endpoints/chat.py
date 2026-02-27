@@ -108,37 +108,6 @@ async def chat_stream_endpoint(
 
     context_text = "\n\n".join(doc.page_content for doc in retrieved_docs)
 
-    # 그래프 출력용 헬퍼 — 시스템 프롬프트에 삽입되어 LLM이 해당 코드를 복사·사용하도록 유도
-    _PLOT_HELPER_SNIPPET = '''\
-import io as _io, base64 as _b64
-
-def _save_plot_as_b64(max_px: int = 1000):
-    import matplotlib.pyplot as _plt
-    _fig = _plt.gcf()
-    try:
-        from PIL import Image as _Img
-        _buf = _io.BytesIO()
-        _fig.savefig(_buf, format="png", bbox_inches="tight", dpi=150)
-        _buf.seek(0)
-        _img = _Img.open(_buf).convert("RGB")
-        _w, _h = _img.size
-        if max(_w, _h) > max_px:
-            _s = max_px / max(_w, _h)
-            _img = _img.resize((int(_w * _s), int(_h * _s)), _Img.LANCZOS)
-        _out = _io.BytesIO()
-        _img.save(_out, format="webp", quality=82)
-        _b64str = _b64.b64encode(_out.getvalue()).decode()
-        _fmt = "webp"
-    except Exception:
-        _buf2 = _io.BytesIO()
-        _fig.savefig(_buf2, format="png", bbox_inches="tight", dpi=100)
-        _b64str = _b64.b64encode(_buf2.getvalue()).decode()
-        _fmt = "png"
-    _plt.close("all")
-    print(f"<b64img>{_fmt}:{_b64str}</b64img>")
-# <<<HELPER_END>>>
-'''
-
     system_content = (
         "당신은 KERI 기술 지원 전문가입니다. 아래 제공된 [참고 문서] 내용을 바탕으로 질문에 답변하세요. "
         "문서에 내용이 없다면 '해당 내용은 문서에서 찾을 수 없습니다'라고 답변하세요.\n\n"
@@ -147,22 +116,16 @@ def _save_plot_as_b64(max_px: int = 1000):
         "Python 코드를 `<code-execute>` 태그로 감싸서 출력하세요. "
         "이 태그 안의 코드는 서버의 로컬 Python 인터프리터가 직접 실행합니다.\n"
         "코드 예시를 텍스트로만 제시하지 말고, 반드시 `<code-execute>` 태그를 사용하세요.\n\n"
-        "━━━ 그래프·플롯 출력 규칙 (반드시 준수) ━━━\n"
+        "━━━ 그래프·플롯 출력 규칙 ━━━\n"
         "그래프·차트·플롯 등 시각화 코드를 실행할 때는 아래 규칙을 **엄격히** 따르세요.\n\n"
-        "1. **[필수] `_save_plot_as_b64` 함수는 실행 환경에 미리 정의되어 있지 않습니다.** "
-        "반드시 아래 헬퍼 코드를 `<code-execute>` 태그 안 코드의 **맨 첫 줄부터** 그대로 복사하여 포함하세요. "
-        "헬퍼 코드 없이 `_save_plot_as_b64()` 를 호출하면 NameError 가 발생합니다.\n"
-        "2. 헬퍼 정의 + 그래프 코드를 **하나의 `<code-execute>` 블록** 에 모두 작성하세요. 절대 두 번에 나눠 실행하지 마세요.\n"
-        "3. `plt.show()` 를 절대 호출하지 말고, 그래프 완성 후 반드시 `_save_plot_as_b64()` 를 호출하세요.\n"
-        "4. `_save_plot_as_b64()` 가 출력하는 `<b64img>…</b64img>` 문자열을 텍스트 응답에 절대 인용·반복하지 마세요. "
+        "1. `_save_plot_as_b64()` 함수는 실행 환경에 **미리 정의**되어 있습니다. "
+        "별도로 정의할 필요 없이 바로 호출하면 됩니다.\n"
+        "2. `plt.show()` 를 절대 호출하지 말고, 그래프 완성 후 반드시 `_save_plot_as_b64()` 를 호출하세요.\n"
+        "3. `_save_plot_as_b64()` 가 출력하는 `<b64img>…</b64img>` 문자열을 텍스트 응답에 절대 인용·반복하지 마세요. "
         "그 문자열은 UI가 자동으로 이미지로 변환합니다.\n"
-        "5. 그래프가 생성되었음을 응답에서 언급할 때는 '실행 결과에 그래프가 표시됩니다.'처럼 짧게만 작성하세요.\n\n"
-        "아래가 반드시 포함해야 할 헬퍼 코드입니다:\n"
-        f"```python\n{_PLOT_HELPER_SNIPPET}```\n\n"
+        "4. 그래프가 생성되었음을 응답에서 언급할 때는 '실행 결과에 그래프가 표시됩니다.'처럼 짧게만 작성하세요.\n\n"
         "올바른 사용 예시:\n"
         "<code-execute>\n"
-        "import io as _io, base64 as _b64\n"
-        "def _save_plot_as_b64(max_px=1000): ...\n\n"
         "import matplotlib.pyplot as plt\n"
         "plt.plot([1,2,3], [4,5,6])\n"
         "_save_plot_as_b64()  # plt.show() 대신\n"

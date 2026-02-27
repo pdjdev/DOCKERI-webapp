@@ -36,6 +36,33 @@ def _setup_korean_font():
 
 _setup_korean_font()
 del _setup_korean_font, _plt_setup, _fm
+
+def _save_plot_as_b64(max_px: int = 1000):
+    # 현재 matplotlib figure를 base64로 인코딩해 <b64img> 태그로 출력
+    import io, base64
+    import matplotlib.pyplot as _plt
+    _fig = _plt.gcf()
+    try:
+        from PIL import Image as _Img
+        _buf = io.BytesIO()
+        _fig.savefig(_buf, format="png", bbox_inches="tight", dpi=150)
+        _buf.seek(0)
+        _img = _Img.open(_buf).convert("RGB")
+        _w, _h = _img.size
+        if max(_w, _h) > max_px:
+            _s = max_px / max(_w, _h)
+            _img = _img.resize((int(_w * _s), int(_h * _s)), _Img.LANCZOS)
+        _out = io.BytesIO()
+        _img.save(_out, format="webp", quality=82)
+        _b64str = base64.b64encode(_out.getvalue()).decode()
+        _fmt = "webp"
+    except Exception:
+        _buf2 = io.BytesIO()
+        _fig.savefig(_buf2, format="png", bbox_inches="tight", dpi=100)
+        _b64str = base64.b64encode(_buf2.getvalue()).decode()
+        _fmt = "png"
+    _plt.close("all")
+    print(f"<b64img>{_fmt}:{_b64str}</b64img>")
 """
 
 
